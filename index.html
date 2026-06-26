@@ -5,6 +5,15 @@
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>biotech-labs</title>
+    <script>
+      // קובע ערכת נושא לפני הצביעה הראשונה (ברירת מחדל: בהיר) — מונע הבהוב
+      (function () {
+        try {
+          var t = localStorage.getItem('biolabs-theme');
+          document.documentElement.setAttribute('data-theme', (t === 'dark' || t === 'light') ? t : 'light');
+        } catch (e) { document.documentElement.setAttribute('data-theme', 'light'); }
+      })();
+    </script>
   </head>
      <script src="https://cdn.tailwindcss.com"></script>
   <body>

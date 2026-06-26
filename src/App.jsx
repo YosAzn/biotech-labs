@@ -1,11 +1,74 @@
-import React, { useState } from 'react';
-import { 
-  Microscope, Activity, ChevronLeft, Info, List, ClipboardList, 
-  LineChart, TestTube2, Droplets, Beaker, Thermometer, Clock, 
-  GitMerge, Fingerprint, Dna, Zap, Home, Image as ImageIcon,
-  CheckCircle2, XCircle, BrainCircuit, FileText, Send, Sparkles, X, Download,
-  Calculator, BookOpen, RefreshCw, TableProperties, ListChecks
+import React, { useState, useEffect, useRef } from 'react';
+import {
+  Microscope, Activity, ChevronLeft, ChevronRight, Info, List, ClipboardList,
+  LineChart, TestTube2, Droplets, Beaker, Thermometer, Clock,
+  GitMerge, Fingerprint, Dna, Zap, Image as ImageIcon,
+  CheckCircle2, BrainCircuit, FileText, X, Upload, Trash2, Images, ExternalLink,
+  Sun, Moon, Calculator, BookOpen, RefreshCw, TableProperties, ListChecks
 } from 'lucide-react';
+
+// --- Neon accent (hex) per lab, derived from its Tailwind textAccent ---
+const NEON = {
+  purple: '#c084fc', cyan: '#22d3ee', emerald: '#34d399', orange: '#fb923c',
+  pink: '#f472b6', yellow: '#facc15', lime: '#a3e635', teal: '#2dd4bf',
+  blue: '#60a5fa', rose: '#fb7185', amber: '#fbbf24',
+};
+const neonOf = (textAccent = '') => {
+  const key = Object.keys(NEON).find(k => textAccent.includes(k));
+  return NEON[key] || '#22d3ee';
+};
+
+// --- Google Drive helpers: turn share links into inline preview embeds ---
+const driveId = (url = '') => {
+  const m = url.match(/\/d\/([^/]+)/) || url.match(/[?&]id=([^&]+)/);
+  return m ? m[1] : null;
+};
+const drivePreview = (url = '') => {
+  const id = driveId(url);
+  return id ? `https://drive.google.com/file/d/${id}/preview` : url;
+};
+const fileKind = (mime = '') =>
+  mime.startsWith('image/') ? 'image' : (mime === 'application/pdf' ? 'pdf' : 'other');
+
+// --- IndexedDB: persist user-uploaded files (images / PDFs) across reloads ---
+const IDB_NAME = 'biolabs-uploads';
+const IDB_STORE = 'files';
+function openIDB() {
+  return new Promise((resolve, reject) => {
+    const req = indexedDB.open(IDB_NAME, 1);
+    req.onupgradeneeded = () => req.result.createObjectStore(IDB_STORE, { keyPath: 'id' });
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => reject(req.error);
+  });
+}
+async function idbAll() {
+  try {
+    const db = await openIDB();
+    return await new Promise((resolve) => {
+      const req = db.transaction(IDB_STORE).objectStore(IDB_STORE).getAll();
+      req.onsuccess = () => resolve(req.result || []);
+      req.onerror = () => resolve([]);
+    });
+  } catch { return []; }
+}
+async function idbPut(rec) {
+  const db = await openIDB();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(IDB_STORE, 'readwrite');
+    tx.objectStore(IDB_STORE).put(rec);
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => reject(tx.error);
+  });
+}
+async function idbDelete(id) {
+  const db = await openIDB();
+  return new Promise((resolve) => {
+    const tx = db.transaction(IDB_STORE, 'readwrite');
+    tx.objectStore(IDB_STORE).delete(id);
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => resolve();
+  });
+}
 
 // --- DATA: 8 המעבדות - מדויקות לפי אוגדן משרד החינוך, כולל קישורי גוגל דרייב ישירים (מצגות ואינפוגרפיקות PNG) ---
 const labsData = [
@@ -369,7 +432,7 @@ const ScientificChart = ({ data, type, xAxis, yAxis, textAccent, graphTitle }) =
   const getY = (val) => height - padBottom - (val / yScaleMax) * innerH;
 
   return (
-    <div className="w-full bg-[#0a0f1c] rounded-[2rem] border border-slate-700 relative p-6 mt-6 shadow-2xl flex flex-col items-center">
+    <div className="w-full chart-shell rounded-[2rem] relative p-6 mt-6 shadow-2xl flex flex-col items-center">
       <svg viewBox={`0 0 ${width} ${height}`} className="w-full h-auto drop-shadow-xl" style={{fontFamily: 'sans-serif'}}>
         
         <text x={width/2} y={padTop/2} fill="white" fontSize="18" fontWeight="bold" textAnchor="middle" className="tracking-wide">
@@ -469,112 +532,211 @@ const QuizContent = ({ activeLab }) => {
   );
 };
 
-// --- עוזר ג'מיני (מותאם למובייל) ---
-const GeminiAssistant = () => {
-  const [isOpen, setIsOpen] = useState(false);
-  const [input, setInput] = useState('');
-  const [messages, setMessages] = useState([{ role: 'model', text: 'שלום! אני ג\'מיני, עוזר המעבדה שלך 🧬. איך אוכל לעזור לך להתכונן לבגרות?' }]);
-  const [isLoading, setIsLoading] = useState(false);
+// --- מציג גלריה (Lightbox) למצגות / אינפוגרפיקות / קבצים שהועלו ---
+function GalleryViewer({ items, startIndex = 0, accent = '#22d3ee', onClose }) {
+  const safeItems = (items || []).filter(Boolean);
+  const [i, setI] = useState(startIndex);
 
-  const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
+  useEffect(() => {
+    const onKey = (e) => {
+      if (e.key === 'Escape') onClose();
+      else if (e.key === 'ArrowLeft') setI(v => (v + 1) % safeItems.length);
+      else if (e.key === 'ArrowRight') setI(v => (v - 1 + safeItems.length) % safeItems.length);
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [safeItems.length, onClose]);
 
-  const handleSend = async () => {
-    if (!input.trim()) return;
-    const userText = input.trim();
-    const newMessages = [...messages, {role: 'user', text: userText}];
-    setMessages(newMessages);
-    setInput('');
-    setIsLoading(true);
+  if (!safeItems.length) return null;
+  const idx = Math.min(i, safeItems.length - 1);
+  const item = safeItems[idx];
+  const go = (d) => setI(v => (v + d + safeItems.length) % safeItems.length);
 
-    try {
-      const formattedHistory = messages.map(msg => ({
-        role: msg.role === 'user' ? 'user' : 'model',
-        parts: [{ text: msg.text }]
-      }));
-
-      const payload = {
-        contents: [...formattedHistory, { role: 'user', parts: [{ text: userText }] }],
-        systemInstruction: {
-          parts: [{ text: "אתה עוזר וירטואלי מומחה למעבדות ביוטכנולוגיה, המיועד לעזור לתלמידי תיכון בישראל הניגשים לבגרות (5 יח\"ל). אתה בקיא באוגדן המעבדות של משרד החינוך וב-8 מעבדות החובה. עליך לענות באדיבות, בקצרה ובעברית. תן הסברים ברורים ומדעיים." }]
-        }
-      };
-
-      let retries = 5;
-      let delays = [1000, 2000, 4000, 8000, 16000];
-      let responseText = "מצטער, חלה שגיאה לא צפויה.";
-      
-      for (let i = 0; i < retries; i++) {
-        try {
-          const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`, {
-            method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload)
-          });
-          if (!res.ok) throw new Error('API Error');
-          const data = await res.json();
-          responseText = data.candidates?.[0]?.content?.parts?.[0]?.text || "לא הצלחתי לייצר תשובה.";
-          break;
-        } catch (err) {
-          if (i === retries - 1) responseText = "מצטער, חלה שגיאה בתקשורת עם השרת.";
-          else await new Promise(resolve => setTimeout(resolve, delays[i]));
-        }
-      }
-      setMessages(prev => [...prev, {role: 'model', text: responseText}]);
-    } catch (e) {
-      setMessages(prev => [...prev, {role: 'model', text: "התרחשה שגיאה."}]);
-    } finally {
-      setIsLoading(false);
-    }
+  const stage = () => {
+    if (item.kind === 'image') return <img src={item.src} alt={item.title || ''} />;
+    if (item.kind === 'pdf')   return <iframe src={item.src} title={item.title || 'pdf'} />;
+    if (item.kind === 'drive') return <iframe src={drivePreview(item.src)} title={item.title || 'drive'} allow="autoplay" allowFullScreen />;
+    return <iframe src={item.src} title={item.title || 'doc'} />;
   };
 
   return (
-    <div className="fixed bottom-4 left-4 sm:bottom-10 sm:left-10 z-[100] flex flex-col items-start" dir="rtl">
-      {!isOpen ? (
-        <button onClick={() => setIsOpen(true)} className="bg-gradient-to-r from-cyan-500 to-blue-600 text-white rounded-full px-5 py-4 sm:px-8 sm:py-6 shadow-[0_0_30px_rgba(6,182,212,0.5)] hover:scale-105 transition-all font-black text-lg sm:text-2xl border border-white/20 flex items-center gap-2">
-          <Sparkles className="w-5 h-5 sm:w-6 sm:h-6 text-white" />
-          <span className="hidden sm:inline">💬 שאל את ג'מיני</span>
-          <span className="sm:hidden">ג'מיני</span>
-        </button>
-      ) : (
-        <div className="w-[calc(100vw-2rem)] sm:w-[450px] h-[75vh] max-h-[650px] bg-slate-900/95 backdrop-blur-3xl border border-white/20 rounded-[2rem] sm:rounded-[3rem] shadow-[0_30px_100px_rgba(0,0,0,0.9)] flex flex-col overflow-hidden animate-in slide-in-from-bottom-10 duration-500">
-          <div className="bg-white/5 border-b border-white/10 p-5 sm:p-8 flex justify-between items-center">
-            <div className="flex items-center gap-2 sm:gap-3"><Sparkles className="w-5 h-5 sm:w-6 sm:h-6 text-cyan-400" /><span className="font-black text-xl sm:text-2xl text-white">ג'מיני AI</span></div>
-            <button onClick={() => setIsOpen(false)} className="text-slate-400 hover:text-white p-2 bg-white/5 rounded-full"><X className="w-5 h-5 sm:w-6 sm:h-6" /></button>
+    <div className="gallery-backdrop" dir="rtl" onClick={onClose}>
+      <div className="gallery-panel" style={{ '--gv-accent': accent }} onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center justify-between px-6 py-4 border-b border-white/10">
+          <div className="flex items-center gap-3 min-w-0">
+            <Images className="w-5 h-5 shrink-0" style={{ color: accent }} />
+            <span className="font-black text-lg truncate text-white">{item.title || 'תצוגה'}</span>
           </div>
-          <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-4 sm:space-y-6">
-            {messages.map((m, idx) => (
-              <div key={idx} className={`flex ${m.role === 'user' ? 'justify-start' : 'justify-end'}`}>
-                <div className={`max-w-[90%] sm:max-w-[85%] p-4 sm:p-5 rounded-2xl sm:rounded-3xl text-base sm:text-lg leading-relaxed ${m.role === 'user' ? 'bg-cyan-600 text-white' : 'bg-white/10 text-slate-200 border border-white/10'} whitespace-pre-wrap`}>{m.text}</div>
-              </div>
-            ))}
-            {isLoading && (
-              <div className="flex justify-end">
-                <div className="max-w-[85%] p-4 rounded-3xl text-base bg-white/10 text-slate-400 border border-white/10">מקליד...</div>
-              </div>
+          <div className="flex items-center gap-2 sm:gap-3">
+            <span className="text-sm font-bold text-slate-400 whitespace-nowrap">{idx + 1} / {safeItems.length}</span>
+            {item.kind === 'drive' && (
+              <a href={item.src} target="_blank" rel="noreferrer" title="פתח במקור (Drive)" className="text-slate-400 hover:text-white p-2 rounded-full bg-white/5"><ExternalLink className="w-5 h-5" /></a>
             )}
+            <button onClick={onClose} title="סגור" className="text-slate-400 hover:text-white p-2 rounded-full bg-white/5"><X className="w-5 h-5" /></button>
           </div>
-          <div className="p-4 sm:p-6 bg-black/40 border-t border-white/10 flex gap-2 sm:gap-3">
-            <input value={input} onChange={e => setInput(e.target.value)} onKeyDown={e => e.key === 'Enter' && !isLoading && handleSend()} className="flex-1 bg-white/5 border border-white/10 rounded-full px-4 sm:px-6 py-3 sm:py-4 text-white text-base sm:text-lg focus:outline-none focus:border-cyan-500/50" placeholder="הקלד שאלה..." disabled={isLoading} />
-            <button onClick={handleSend} disabled={isLoading || !input.trim()} className="bg-cyan-500 p-3 sm:p-4 rounded-full text-white hover:bg-cyan-400 transition-colors shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"><Send className="w-5 h-5 sm:w-6 sm:h-6" /></button>
+        </div>
+        <div className="gallery-stage">
+          {stage()}
+          {safeItems.length > 1 && (
+            <>
+              <button className="gallery-nav next" onClick={() => go(1)} aria-label="הבא"><ChevronLeft className="w-6 h-6" /></button>
+              <button className="gallery-nav prev" onClick={() => go(-1)} aria-label="קודם"><ChevronRight className="w-6 h-6" /></button>
+            </>
+          )}
+        </div>
+        {safeItems.length > 1 && (
+          <div className="flex gap-3 px-6 py-4 overflow-x-auto scrollbar-hide border-t border-white/10">
+            {safeItems.map((it, k) => (
+              <button key={k} onClick={() => setI(k)} title={it.title || ''} className={`gv-thumb ${k === idx ? 'active' : ''}`}>
+                {it.kind === 'image'
+                  ? <img src={it.src} alt="" />
+                  : (it.kind === 'pdf' ? <FileText className="w-5 h-5" /> : <ImageIcon className="w-5 h-5" />)}
+              </button>
+            ))}
           </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// --- מקטע גלריה / העלאות בעמוד הבית ---
+function UploadGallery({ uploads, onAdd, onRemove, onOpen }) {
+  const inputRef = useRef(null);
+  const [drag, setDrag] = useState(false);
+
+  const handleFiles = (fileList) => {
+    const files = Array.from(fileList || []).filter(f =>
+      f.type.startsWith('image/') || f.type === 'application/pdf');
+    if (files.length) onAdd(files);
+  };
+
+  return (
+    <div className="animate-in fade-in duration-500 max-w-6xl mx-auto">
+      <div
+        className={`upload-zone bg-slate-900/40 backdrop-blur-xl p-12 mb-12 text-center cursor-pointer ${drag ? 'drag' : ''}`}
+        onClick={() => inputRef.current?.click()}
+        onDragOver={(e) => { e.preventDefault(); setDrag(true); }}
+        onDragLeave={() => setDrag(false)}
+        onDrop={(e) => { e.preventDefault(); setDrag(false); handleFiles(e.dataTransfer.files); }}
+      >
+        <div className="w-24 h-24 rounded-full bg-white/5 border border-white/10 flex items-center justify-center mx-auto mb-6">
+          <Upload className="w-12 h-12 text-cyan-400" />
+        </div>
+        <h3 className="text-3xl font-black text-white mb-3">העלאת מצגות, תמונות או PDF</h3>
+        <p className="text-lg text-slate-400 font-light">גררו לכאן קבצים או לחצו לבחירה — הם יישמרו במכשיר זה ויוצגו בגלריה.</p>
+        <input ref={inputRef} type="file" accept="image/*,application/pdf" multiple className="hidden"
+               onChange={(e) => { handleFiles(e.target.files); e.target.value = ''; }} />
+      </div>
+
+      {uploads.length === 0 ? (
+        <p className="text-center text-slate-500 text-xl font-light py-10">עדיין לא הועלו קבצים.</p>
+      ) : (
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-8">
+          {uploads.map((u, k) => (
+            <div key={u.id} className="group relative bg-slate-900/40 border border-white/10 rounded-[2rem] overflow-hidden shadow-2xl cursor-pointer hover:-translate-y-2 transition-all duration-500"
+                 onClick={() => onOpen(k)}>
+              <div className="h-44 flex items-center justify-center bg-white/5 overflow-hidden">
+                {u.kind === 'image'
+                  ? <img src={u.src} alt={u.name} className="w-full h-full object-cover" />
+                  : <FileText className="w-16 h-16 text-cyan-400" />}
+              </div>
+              <div className="p-4 flex items-center justify-between gap-2">
+                <span className="text-sm font-bold text-slate-300 truncate">{u.name}</span>
+                <button onClick={(e) => { e.stopPropagation(); onRemove(u.id); }} title="מחק"
+                        className="text-slate-500 hover:text-red-400 p-1 rounded-full shrink-0"><Trash2 className="w-4 h-4" /></button>
+              </div>
+            </div>
+          ))}
         </div>
       )}
     </div>
   );
-};
+}
+
+// --- כפתור החלפת ערכת נושא (בהיר / כהה) ---
+function ThemeToggle({ theme, onToggle }) {
+  return (
+    <button className="theme-toggle" onClick={onToggle}
+            title={theme === 'light' ? 'מצב כהה' : 'מצב בהיר'}>
+      {theme === 'light' ? <Moon className="w-5 h-5" /> : <Sun className="w-5 h-5" />}
+      <span>{theme === 'light' ? 'כהה' : 'בהיר'}</span>
+    </button>
+  );
+}
 
 // --- האפליקציה המרכזית (App) ---
 export default function App() {
   const [activeLabId, setActiveLabId] = useState(null);
-  const [activeTab, setActiveTab] = useState('report'); 
-  const [homeTab, setHomeTab] = useState('labs'); 
+  const [activeTab, setActiveTab] = useState('report');
+  const [homeTab, setHomeTab] = useState('labs');
+
+  // ערכת נושא — ברירת מחדל בהיר
+  const [theme, setTheme] = useState(() => {
+    if (typeof localStorage !== 'undefined') {
+      const saved = localStorage.getItem('biolabs-theme');
+      if (saved === 'light' || saved === 'dark') return saved;
+    }
+    return 'light';
+  });
+  useEffect(() => {
+    document.documentElement.setAttribute('data-theme', theme);
+    try { localStorage.setItem('biolabs-theme', theme); } catch { /* ignore */ }
+  }, [theme]);
+  const toggleTheme = () => setTheme(t => (t === 'light' ? 'dark' : 'light'));
+
+  // קבצים שהמשתמש העלה (נשמרים ב-IndexedDB על המכשיר)
+  const [uploads, setUploads] = useState([]);
+  useEffect(() => {
+    const urls = [];
+    idbAll().then(recs => {
+      setUploads(recs.map(r => {
+        const src = URL.createObjectURL(r.blob);
+        urls.push(src);
+        return { id: r.id, name: r.name, kind: fileKind(r.type), src };
+      }));
+    });
+    return () => urls.forEach(u => URL.revokeObjectURL(u));
+  }, []);
+
+  const addUploads = async (files) => {
+    const added = [];
+    for (const f of files) {
+      const id = (crypto.randomUUID ? crypto.randomUUID() : String(Date.now()) + Math.random());
+      try {
+        await idbPut({ id, name: f.name, type: f.type, blob: f });
+        added.push({ id, name: f.name, kind: fileKind(f.type), src: URL.createObjectURL(f) });
+      } catch (e) { console.error('upload failed', e); }
+    }
+    if (added.length) setUploads(prev => [...added, ...prev]);
+  };
+  const removeUpload = async (id) => {
+    await idbDelete(id);
+    setUploads(prev => {
+      const gone = prev.find(u => u.id === id);
+      if (gone) URL.revokeObjectURL(gone.src);
+      return prev.filter(u => u.id !== id);
+    });
+  };
+
+  // מציג הגלריה (Lightbox)
+  const [gallery, setGallery] = useState(null); // { items, startIndex, accent }
+  const openGallery = (items, startIndex = 0, accent = '#22d3ee') =>
+    setGallery({ items: (items || []).filter(Boolean), startIndex, accent });
+  const closeGallery = () => setGallery(null);
+  const uploadItems = uploads.map(u => ({ kind: u.kind, src: u.src, title: u.name }));
 
   const activeLab = labsData.find(l => l.id === activeLabId);
   const goHome = () => { setActiveLabId(null); setHomeTab('labs'); };
 
   return (
-    <div dir="rtl" className="min-h-screen bg-[#030712] text-slate-300 font-sans flex flex-col overflow-x-hidden relative">
-      
+    <div dir="rtl" className="page-shell min-h-screen text-slate-300 font-sans flex flex-col overflow-x-hidden relative">
+
+      {/* כפתור החלפת ערכת נושא */}
+      <ThemeToggle theme={theme} onToggle={toggleTheme} />
+
       {/* רקע עתידני */}
-      <div className="fixed inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-slate-900/40 via-[#030712] to-[#030712] pointer-events-none"></div>
+      <div className="app-bg fixed inset-0 pointer-events-none"></div>
 
       <main className="flex-1 relative p-6 lg:p-12 z-10">
         
@@ -584,7 +746,7 @@ export default function App() {
              
              {/* כותרת מפלצתית */}
              <div className="text-center mb-24 flex flex-col items-center">
-                 <h1 className="text-6xl md:text-8xl lg:text-[11rem] font-black text-transparent bg-clip-text bg-gradient-to-b from-white via-cyan-100 to-cyan-600 drop-shadow-[0_0_60px_rgba(6,182,212,0.6)] mb-4 sm:mb-8 tracking-tighter leading-none select-none">BIO<span className="text-blue-500">TECH</span></h1>
+                 <h1 className="hero-title text-6xl md:text-8xl lg:text-[11rem] font-black text-transparent bg-clip-text drop-shadow-[0_0_60px_rgba(6,182,212,0.6)] mb-4 sm:mb-8 tracking-tighter leading-none select-none">BIO<span className="text-blue-500">TECH</span></h1>
 
                  <p className="text-cyan-300 text-lg sm:text-3xl md:text-4xl font-light tracking-[0.1em] sm:tracking-[0.2em] uppercase drop-shadow-md text-center">מעבדת חקר וירטואלית לבגרות</p>
 
@@ -595,7 +757,8 @@ export default function App() {
                {[
                  {id: 'labs', label: 'מאגר מעבדות האוגדן', icon: <List />},
                  {id: 'highlights', label: 'דגשים לבגרות', icon: <BookOpen />},
-                 {id: 'course-presentation', label: 'מצגת הקורס', icon: <FileText />}
+                 {id: 'course-presentation', label: 'מצגת הקורס', icon: <FileText />},
+                 {id: 'gallery', label: 'גלריה / העלאות', icon: <Images />}
                ].map(t => (
                  <button 
                    key={t.id} 
@@ -606,14 +769,14 @@ export default function App() {
                  </button>
                ))}
                
-               {/* כפתור מפת הקורס */}
-               <a href="https://drive.google.com/open?id=12-uho9AGii0H3hgVJ_qT3BloYfoqTXg1" target="_blank" rel="noreferrer" className="px-10 py-5 rounded-full border backdrop-blur-md transition-all text-xl font-bold flex items-center gap-3 shadow-xl whitespace-nowrap bg-white/5 border-white/10 text-slate-400 hover:text-white hover:bg-white/10 hover:border-emerald-500/50 hover:text-emerald-300">
+               {/* מפת הקורס — תצוגה בגלריה */}
+               <button onClick={() => openGallery([{ kind: 'drive', src: 'https://drive.google.com/open?id=12-uho9AGii0H3hgVJ_qT3BloYfoqTXg1', title: 'מפת הקורס' }], 0, '#34d399')} className="px-10 py-5 rounded-full border backdrop-blur-md transition-all text-xl font-bold flex items-center gap-3 shadow-xl whitespace-nowrap bg-white/5 border-white/10 text-slate-400 hover:text-white hover:bg-white/10 hover:border-emerald-500/50 hover:text-emerald-300">
                  <ImageIcon className="w-6 h-6" /> מפת הקורס
-               </a>
-               
-               <a href="https://drive.google.com/open?id=17j3PZis8m0nUYSyOCznjfc1Ksk-YmrBp" target="_blank" rel="noreferrer" className="px-10 py-5 rounded-full border backdrop-blur-md transition-all text-xl font-bold flex items-center gap-3 shadow-xl whitespace-nowrap bg-white/5 border-white/10 text-slate-400 hover:text-white hover:bg-white/10 hover:border-blue-500/50 hover:text-blue-300">
+               </button>
+
+               <button onClick={() => openGallery([{ kind: 'drive', src: 'https://drive.google.com/open?id=17j3PZis8m0nUYSyOCznjfc1Ksk-YmrBp', title: "Student's Guide" }], 0, '#60a5fa')} className="px-10 py-5 rounded-full border backdrop-blur-md transition-all text-xl font-bold flex items-center gap-3 shadow-xl whitespace-nowrap bg-white/5 border-white/10 text-slate-400 hover:text-white hover:bg-white/10 hover:border-blue-500/50 hover:text-blue-300">
                  <BookOpen className="w-6 h-6" /> Student's Guide
-               </a>
+               </button>
              </div>
 
              {/* --- לשונית מצגת הקורס --- */}
@@ -624,10 +787,20 @@ export default function App() {
                   </div>
                   <h2 className="text-5xl font-black text-white mb-6">מצגת הקורס</h2>
                   <p className="text-2xl text-slate-300 mb-12 font-light leading-relaxed">המצגת המקיפה למודל עמודי התווך בביוטכנולוגיה. כוללת פירוט על תהליכים, יתרונות, חסרונות והיבטים מוסריים.</p>
-                  <a href="https://drive.google.com/open?id=1CuPij_51RcNfXzZ56tbliB3Id8JBotFn" target="_blank" rel="noreferrer" className="bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white px-12 py-6 rounded-full font-black text-2xl shadow-2xl hover:scale-105 transition-all flex items-center gap-4">
-                    <FileText className="w-8 h-8"/> פתח מצגת קורס
-                  </a>
+                  <button onClick={() => openGallery([{ kind: 'drive', src: 'https://drive.google.com/open?id=1CuPij_51RcNfXzZ56tbliB3Id8JBotFn', title: 'מצגת הקורס' }], 0, '#22d3ee')} className="bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white px-12 py-6 rounded-full font-black text-2xl shadow-2xl hover:scale-105 transition-all flex items-center gap-4">
+                    <FileText className="w-8 h-8"/> צפה במצגת הקורס
+                  </button>
                </div>
+             )}
+
+             {/* --- לשונית גלריה / העלאות --- */}
+             {homeTab === 'gallery' && (
+               <UploadGallery
+                 uploads={uploads}
+                 onAdd={addUploads}
+                 onRemove={removeUpload}
+                 onOpen={(k) => openGallery(uploadItems, k, '#22d3ee')}
+               />
              )}
 
              {/* --- לשונית דגשים --- */}
@@ -638,12 +811,18 @@ export default function App() {
                <div className="animate-in fade-in duration-500">
                  <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-10 px-4 mb-32">
                    {labsData.map(lab => (
-                     <div key={lab.id} onClick={()=>{setActiveLabId(lab.id); setActiveTab('report');}} className={`cursor-pointer bg-slate-900/40 border border-white/10 rounded-[2.5rem] overflow-hidden group hover:-translate-y-4 transition-all duration-500 flex flex-col shadow-2xl relative ${lab.cardHover}`}>
-                       <div className={`absolute inset-0 opacity-0 group-hover:opacity-5 transition-opacity duration-500 bg-gradient-to-br ${lab.color}`}></div>
-                       <div className="p-10 flex-1 relative z-10">
-                         <div className={`w-20 h-20 rounded-[2rem] bg-white/5 border border-white/10 flex items-center justify-center mb-8 group-hover:scale-110 group-hover:rotate-6 transition-all duration-500 ${lab.textAccent} shadow-lg`}>
-                           {React.cloneElement(lab.icon, { className: "w-10 h-10" })}
-                         </div>
+                     <div key={lab.id} onClick={()=>{setActiveLabId(lab.id); setActiveTab('report');}}
+                          style={{ '--neon': neonOf(lab.textAccent) }}
+                          className="lab-card group cursor-pointer bg-slate-900/40 border border-white/10 rounded-[2.5rem] flex flex-col shadow-2xl relative min-h-[19rem] hover:-translate-y-3">
+                       {/* שכבת חיתוך לעיגול הפינות (גוון רקע + סימן-מים) */}
+                       <div className="absolute inset-0 rounded-[2.5rem] overflow-hidden">
+                         <div className={`absolute inset-0 opacity-0 group-hover:opacity-10 transition-opacity duration-500 bg-gradient-to-br ${lab.color}`}></div>
+                         <div className="lab-watermark">{React.cloneElement(lab.icon, { strokeWidth: 1 })}</div>
+                       </div>
+                       {/* אייקון מוגדל בפינה — זז בריחוף */}
+                       <div className="lab-icon-badge">{React.cloneElement(lab.icon)}</div>
+                       {/* תוכן */}
+                       <div className="relative z-10 px-9 pb-9 pt-28 flex-1 flex flex-col justify-end">
                          <h4 className="font-black text-white mb-3 text-3xl tracking-tight leading-tight">{lab.title}</h4>
                          <p className="text-slate-400 text-lg line-clamp-2 font-light">{lab.subtitle}</p>
                        </div>
@@ -697,12 +876,23 @@ export default function App() {
               
               <div className="w-px h-12 bg-slate-800 mx-2 self-center hidden sm:block"></div>
 
-              {activeLab.presentationImg && (
-                <a href={activeLab.presentationImg} target="_blank" rel="noreferrer" className="px-10 py-5 rounded-full border border-blue-500/30 bg-blue-600/10 text-blue-300 font-black text-xl hover:bg-blue-600 hover:text-white transition-all shadow-xl flex items-center gap-3"><FileText className="w-6 h-6"/> מצגת מסכמת</a>
-              )}
-              {activeLab.infographicImg && (
-                <a href={activeLab.infographicImg} target="_blank" rel="noreferrer" className="px-10 py-5 rounded-full border border-emerald-500/30 bg-emerald-600/10 text-emerald-300 font-black text-xl hover:bg-emerald-600 hover:text-white transition-all shadow-xl flex items-center gap-3"><ImageIcon className="w-6 h-6"/> אינפוגרפיקה</a>
-              )}
+              {(() => {
+                const items = [
+                  activeLab.presentationImg && { kind: 'drive', src: activeLab.presentationImg, title: `מצגת מסכמת — ${activeLab.title}` },
+                  activeLab.infographicImg && { kind: 'drive', src: activeLab.infographicImg, title: `אינפוגרפיקה — ${activeLab.title}` },
+                ].filter(Boolean);
+                const accent = neonOf(activeLab.textAccent);
+                return (
+                  <>
+                    {activeLab.presentationImg && (
+                      <button onClick={() => openGallery(items, 0, accent)} className="px-10 py-5 rounded-full border border-blue-500/30 bg-blue-600/10 text-blue-300 font-black text-xl hover:bg-blue-600 hover:text-white transition-all shadow-xl flex items-center gap-3"><FileText className="w-6 h-6"/> מצגת מסכמת</button>
+                    )}
+                    {activeLab.infographicImg && (
+                      <button onClick={() => openGallery(items, activeLab.presentationImg ? 1 : 0, accent)} className="px-10 py-5 rounded-full border border-emerald-500/30 bg-emerald-600/10 text-emerald-300 font-black text-xl hover:bg-emerald-600 hover:text-white transition-all shadow-xl flex items-center gap-3"><ImageIcon className="w-6 h-6"/> אינפוגרפיקה</button>
+                    )}
+                  </>
+                );
+              })()}
             </div>
 
             <div className="pb-32">
@@ -800,12 +990,19 @@ export default function App() {
       </main>
       
       {/* תגית קרדיט / פאנל תחתון */}
-      <footer className="py-8 text-center border-t border-slate-800 text-slate-600 font-light z-10 bg-[#030712]">
+      <footer className="app-footer py-8 text-center border-t border-slate-800 text-slate-600 font-light z-10">
          מערכת מעבדות ביוטכנולוגיה | פותח להכנה מיטבית לבחינת הבגרות בתשפ"ו
       </footer>
 
-      {/* העוזר של ג'מיני - תמיד מופיע מעל הכל */}
-      <GeminiAssistant />
+      {/* מציג הגלריה — נפתח מעל הכל */}
+      {gallery && (
+        <GalleryViewer
+          items={gallery.items}
+          startIndex={gallery.startIndex}
+          accent={gallery.accent}
+          onClose={closeGallery}
+        />
+      )}
 
       {/* הסתרת פס גלילה מציק */}
       <style dangerouslySetInnerHTML={{__html: `
