@@ -111,8 +111,12 @@ body {
   background-image: linear-gradient(to bottom, #0f172a, #334155, #475569);
   filter: none;
 }
-/* "TECH" — מבטא מג'נטה במצב בהיר (המצב הכהה שומר על ה-text-blue-500 שלו) */
-[data-theme="light"] .hero-title span { color: #c026d3; }
+/* "TECH" — מג'נטה למעלה → כהה למטה במצב בהיר (המצב הכהה שומר על ה-text-blue-500) */
+[data-theme="light"] .hero-title span {
+  background-image: linear-gradient(to bottom, #c026d3 0%, #a21caf 55%, #581c87 100%);
+  -webkit-background-clip: text; background-clip: text;
+  -webkit-text-fill-color: transparent; color: transparent;
+}
 
 /* =======================  THEME TOGGLE BUTTON  ===================== */
 .theme-toggle {
@@ -185,16 +189,16 @@ body {
   box-shadow: 0 14px 32px -10px var(--neon), inset 0 0 26px -6px var(--neon);
 }
 
-/* huge faint watermark icon for depth (image-2 style) */
+/* large CENTERED watermark emblem (enlarged + thicker stroke set in JSX) */
 .lab-watermark {
-  position: absolute; bottom: -1.5rem; inset-inline-end: -1.5rem; z-index: 0;
-  color: var(--neon); opacity: .06; pointer-events: none;
+  position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%);
+  z-index: 0; color: var(--neon); opacity: .10; pointer-events: none;
   transition: transform .7s ease, opacity .5s ease;
 }
-.lab-watermark svg { width: 11.5rem; height: 11.5rem; }
-.lab-card:hover .lab-watermark { opacity: .11; transform: scale(1.07) rotate(7deg); }
-[data-theme="light"] .lab-watermark { opacity: .08; }
-[data-theme="light"] .lab-card:hover .lab-watermark { opacity: .14; }
+.lab-watermark svg { width: 16rem; height: 16rem; }
+.lab-card:hover .lab-watermark { opacity: .16; transform: translate(-50%,-50%) scale(1.07) rotate(6deg); }
+[data-theme="light"] .lab-watermark { opacity: .11; }
+[data-theme="light"] .lab-card:hover .lab-watermark { opacity: .18; }
 
 /* =======================  GALLERY VIEWER  ======================== */
 .gallery-backdrop {

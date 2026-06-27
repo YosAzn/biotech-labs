@@ -756,8 +756,7 @@ export default function App() {
              <div className="flex justify-center gap-6 mb-20 overflow-x-auto pb-4 px-4">
                {[
                  {id: 'labs', label: 'מאגר מעבדות האוגדן', icon: <List />},
-                 {id: 'highlights', label: 'דגשים לבגרות', icon: <BookOpen />},
-                 {id: 'course-presentation', label: 'מצגת הקורס', icon: <FileText />}
+                 {id: 'highlights', label: 'דגשים לבגרות', icon: <BookOpen />}
                ].map(t => (
                  <button 
                    key={t.id} 
@@ -768,29 +767,19 @@ export default function App() {
                  </button>
                ))}
                
-               {/* מפת הקורס — תצוגה בגלריה */}
-               <button onClick={() => openGallery([{ kind: 'drive', src: 'https://drive.google.com/open?id=12-uho9AGii0H3hgVJ_qT3BloYfoqTXg1', title: 'מפת הקורס' }], 0, '#34d399')} className="px-10 py-5 rounded-full border backdrop-blur-md transition-all text-xl font-bold flex items-center gap-3 shadow-xl whitespace-nowrap bg-white/5 border-white/10 text-slate-400 hover:text-white hover:bg-white/10 hover:border-emerald-500/50 hover:text-emerald-300">
+               {/* מצגת הקורס — נפתחת ישירות בגלריה (ללא טאב נפרד) */}
+               <button onClick={() => openGallery([{ kind: 'drive', src: 'https://drive.google.com/open?id=1CuPij_51RcNfXzZ56tbliB3Id8JBotFn', title: 'מצגת הקורס' }], 0, '#22d3ee')} className="px-10 py-5 rounded-full border backdrop-blur-md transition-all text-xl font-bold flex items-center gap-3 shadow-xl whitespace-nowrap bg-white/5 border-white/10 text-slate-400 hover:text-white hover:bg-white/10 hover:border-cyan-500/50 hover:text-cyan-300">
+                 <FileText className="w-6 h-6" /> מצגת הקורס
+               </button>
+
+               {/* מפת הקורס + Student's Guide מאוחדים — חיצים בגלריה להחלפה */}
+               <button onClick={() => openGallery([
+                 { kind: 'drive', src: 'https://drive.google.com/open?id=12-uho9AGii0H3hgVJ_qT3BloYfoqTXg1', title: 'מפת הקורס' },
+                 { kind: 'drive', src: 'https://drive.google.com/open?id=17j3PZis8m0nUYSyOCznjfc1Ksk-YmrBp', title: "Student's Guide" }
+               ], 0, '#34d399')} className="px-10 py-5 rounded-full border backdrop-blur-md transition-all text-xl font-bold flex items-center gap-3 shadow-xl whitespace-nowrap bg-white/5 border-white/10 text-slate-400 hover:text-white hover:bg-white/10 hover:border-emerald-500/50 hover:text-emerald-300">
                  <ImageIcon className="w-6 h-6" /> מפת הקורס
                </button>
-
-               <button onClick={() => openGallery([{ kind: 'drive', src: 'https://drive.google.com/open?id=17j3PZis8m0nUYSyOCznjfc1Ksk-YmrBp', title: "Student's Guide" }], 0, '#60a5fa')} className="px-10 py-5 rounded-full border backdrop-blur-md transition-all text-xl font-bold flex items-center gap-3 shadow-xl whitespace-nowrap bg-white/5 border-white/10 text-slate-400 hover:text-white hover:bg-white/10 hover:border-blue-500/50 hover:text-blue-300">
-                 <BookOpen className="w-6 h-6" /> Student's Guide
-               </button>
              </div>
-
-             {/* --- לשונית מצגת הקורס --- */}
-             {homeTab === 'course-presentation' && (
-               <div className="flex flex-col items-center justify-center p-20 bg-slate-900/60 rounded-[3rem] border border-white/10 shadow-2xl animate-in zoom-in-95 duration-500 max-w-4xl mx-auto text-center">
-                  <div className="w-40 h-40 rounded-full bg-cyan-900/30 flex items-center justify-center mb-10 border border-cyan-500/30 shadow-[0_0_50px_rgba(6,182,212,0.2)]">
-                    <FileText size={80} className="text-cyan-400" />
-                  </div>
-                  <h2 className="text-5xl font-black text-white mb-6">מצגת הקורס</h2>
-                  <p className="text-2xl text-slate-300 mb-12 font-light leading-relaxed">המצגת המקיפה למודל עמודי התווך בביוטכנולוגיה. כוללת פירוט על תהליכים, יתרונות, חסרונות והיבטים מוסריים.</p>
-                  <button onClick={() => openGallery([{ kind: 'drive', src: 'https://drive.google.com/open?id=1CuPij_51RcNfXzZ56tbliB3Id8JBotFn', title: 'מצגת הקורס' }], 0, '#22d3ee')} className="bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white px-12 py-6 rounded-full font-black text-2xl shadow-2xl hover:scale-105 transition-all flex items-center gap-4">
-                    <FileText className="w-8 h-8"/> צפה במצגת הקורס
-                  </button>
-               </div>
-             )}
 
              {/* --- לשונית דגשים --- */}
              {homeTab === 'highlights' && <div className="animate-in fade-in duration-500"><BagrutHighlights /></div>}
@@ -806,7 +795,7 @@ export default function App() {
                        {/* שכבת חיתוך לעיגול הפינות (גוון רקע + סימן-מים) */}
                        <div className="absolute inset-0 rounded-[2.5rem] overflow-hidden">
                          <div className={`absolute inset-0 opacity-0 group-hover:opacity-10 transition-opacity duration-500 bg-gradient-to-br ${lab.color}`}></div>
-                         <div className="lab-watermark">{React.cloneElement(lab.icon, { strokeWidth: 1 })}</div>
+                         <div className="lab-watermark">{React.cloneElement(lab.icon, { strokeWidth: 1.75 })}</div>
                        </div>
                        {/* אייקון מוגדל בפינה — זז בריחוף */}
                        <div className="lab-icon-badge">{React.cloneElement(lab.icon)}</div>
