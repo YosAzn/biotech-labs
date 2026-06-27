@@ -107,9 +107,12 @@ body {
 /* Hero wordmark — flip the white→cyan gradient to a readable dark gradient */
 .hero-title { background-image: linear-gradient(to bottom, #ffffff, #cffafe, #0891b2); }
 [data-theme="light"] .hero-title {
-  background-image: linear-gradient(to bottom, #0891b2, #2563eb, #4338ca);
+  /* "BIO" — שחור → אפור-עכבר, כהה וכבד יותר מהכחול-תכלת שהיה כאן */
+  background-image: linear-gradient(to bottom, #0f172a, #334155, #475569);
   filter: none;
 }
+/* "TECH" — מבטא מג'נטה במצב בהיר (המצב הכהה שומר על ה-text-blue-500 שלו) */
+[data-theme="light"] .hero-title span { color: #c026d3; }
 
 /* =======================  THEME TOGGLE BUTTON  ===================== */
 .theme-toggle {

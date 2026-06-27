@@ -757,8 +757,7 @@ export default function App() {
                {[
                  {id: 'labs', label: 'מאגר מעבדות האוגדן', icon: <List />},
                  {id: 'highlights', label: 'דגשים לבגרות', icon: <BookOpen />},
-                 {id: 'course-presentation', label: 'מצגת הקורס', icon: <FileText />},
-                 {id: 'gallery', label: 'גלריה / העלאות', icon: <Images />}
+                 {id: 'course-presentation', label: 'מצגת הקורס', icon: <FileText />}
                ].map(t => (
                  <button 
                    key={t.id} 
@@ -791,16 +790,6 @@ export default function App() {
                     <FileText className="w-8 h-8"/> צפה במצגת הקורס
                   </button>
                </div>
-             )}
-
-             {/* --- לשונית גלריה / העלאות --- */}
-             {homeTab === 'gallery' && (
-               <UploadGallery
-                 uploads={uploads}
-                 onAdd={addUploads}
-                 onRemove={removeUpload}
-                 onOpen={(k) => openGallery(uploadItems, k, '#22d3ee')}
-               />
              )}
 
              {/* --- לשונית דגשים --- */}
@@ -873,7 +862,8 @@ export default function App() {
             <div className="flex flex-wrap gap-5">
               <button onClick={()=>setActiveTab('report')} className={`px-10 py-5 rounded-full border backdrop-blur-md transition-all font-black text-xl flex items-center gap-3 ${activeTab==='report'?'bg-white/10 text-white border-white/40 shadow-xl':'border-slate-800 text-slate-500 hover:text-slate-300 hover:border-slate-600'}`}><ClipboardList className="w-6 h-6"/> דוח מעבדה</button>
               <button onClick={()=>setActiveTab('quiz')} className={`px-10 py-5 rounded-full border backdrop-blur-md transition-all font-black text-xl flex items-center gap-3 ${activeTab==='quiz'?'bg-white/10 text-white border-white/40 shadow-xl':'border-slate-800 text-slate-500 hover:text-slate-300 hover:border-slate-600'}`}><BrainCircuit className="w-6 h-6"/> מאגר שאלות</button>
-              
+              <button onClick={()=>setActiveTab('gallery')} className={`px-10 py-5 rounded-full border backdrop-blur-md transition-all font-black text-xl flex items-center gap-3 ${activeTab==='gallery'?'bg-white/10 text-white border-white/40 shadow-xl':'border-slate-800 text-slate-500 hover:text-slate-300 hover:border-slate-600'}`}><Images className="w-6 h-6"/> גלריה / העלאות</button>
+
               <div className="w-px h-12 bg-slate-800 mx-2 self-center hidden sm:block"></div>
 
               {(() => {
@@ -901,7 +891,8 @@ export default function App() {
                   
                   {/* עמודה ימנית: תיאוריה, חומרים ומהלך */}
                   <div className="xl:col-span-2 space-y-10">
-                    <div className={`bg-slate-900/40 border border-slate-800 rounded-[2.5rem] p-10 shadow-2xl border-r-8 ${activeLab.borderAccent.replace('/40','')}`}>
+                    {/* מסגרת בצבע-הניאון של המעבדה — inline hex, זהה במצב בהיר וכהה (גובר על דריסות ה-light) */}
+                    <div style={{ borderColor: neonOf(activeLab.textAccent) }} className="bg-slate-900/40 border-2 border-r-8 rounded-[2.5rem] p-10 shadow-2xl">
                       <h3 className={`text-xl font-black ${activeLab.textAccent} mb-4 uppercase tracking-wider`}>מטרת / שאלת המחקר</h3>
                       <p className="text-3xl text-white font-medium leading-relaxed italic">"{activeLab.researchQuestion}"</p>
                     </div>
@@ -981,8 +972,16 @@ export default function App() {
                     </div>
                   </div>
                 </div>
-              ) : (
+              ) : activeTab === 'quiz' ? (
                 <QuizContent activeLab={activeLab} />
+              ) : (
+                /* גלריה / העלאות בתוך המעבדה (הועבר מעמוד הבית) */
+                <UploadGallery
+                  uploads={uploads}
+                  onAdd={addUploads}
+                  onRemove={removeUpload}
+                  onOpen={(k) => openGallery(uploadItems, k, neonOf(activeLab.textAccent))}
+                />
               )}
             </div>
           </div>
