@@ -665,6 +665,17 @@ function ThemeToggle({ theme, onToggle }) {
   );
 }
 
+// --- כפתור אופציית "סירנת ניאון" בריחוף (כבוי כברירת מחדל) ---
+function NeonToggle({ on, onToggle }) {
+  return (
+    <button className="neon-toggle" onClick={onToggle} aria-pressed={on}
+            title={on ? 'כבה אפקט ניאון מסתובב בריחוף' : 'הפעל אפקט ניאון מסתובב בריחוף'}>
+      <Zap className="w-4 h-4" />
+      <span>ניאון {on ? 'פעיל' : 'כבוי'}</span>
+    </button>
+  );
+}
+
 // --- האפליקציה המרכזית (App) ---
 export default function App() {
   const [activeLabId, setActiveLabId] = useState(null);
@@ -684,6 +695,17 @@ export default function App() {
     try { localStorage.setItem('biolabs-theme', theme); } catch { /* ignore */ }
   }, [theme]);
   const toggleTheme = () => setTheme(t => (t === 'light' ? 'dark' : 'light'));
+
+  // אפקט "סירנת ניאון" בריחוף — כבוי כברירת מחדל, נשמר כאופציה
+  const [neon, setNeon] = useState(() => {
+    if (typeof localStorage !== 'undefined' && localStorage.getItem('biolabs-neon') === 'on') return 'on';
+    return 'off';
+  });
+  useEffect(() => {
+    document.documentElement.setAttribute('data-neon', neon);
+    try { localStorage.setItem('biolabs-neon', neon); } catch { /* ignore */ }
+  }, [neon]);
+  const toggleNeon = () => setNeon(n => (n === 'on' ? 'off' : 'on'));
 
   // קבצים שהמשתמש העלה (נשמרים ב-IndexedDB על המכשיר)
   const [uploads, setUploads] = useState([]);
@@ -732,8 +754,9 @@ export default function App() {
   return (
     <div dir="rtl" className="page-shell min-h-screen text-slate-300 font-sans flex flex-col overflow-x-hidden relative">
 
-      {/* כפתור החלפת ערכת נושא */}
+      {/* כפתור החלפת ערכת נושא + אופציית סירנת-ניאון */}
       <ThemeToggle theme={theme} onToggle={toggleTheme} />
+      <NeonToggle on={neon === 'on'} onToggle={toggleNeon} />
 
       {/* רקע עתידני */}
       <div className="app-bg fixed inset-0 pointer-events-none"></div>
@@ -779,6 +802,11 @@ export default function App() {
                ], 0, '#34d399')} className="px-10 py-5 rounded-full border backdrop-blur-md transition-all text-xl font-bold flex items-center gap-3 shadow-xl whitespace-nowrap bg-white/5 border-white/10 text-slate-400 hover:text-white hover:bg-white/10 hover:border-emerald-500/50 hover:text-emerald-300">
                  <ImageIcon className="w-6 h-6" /> מפת הקורס
                </button>
+
+               {/* קישור חיצוני — המעבדה הווירטואלית (אתר Biotech-Exp) */}
+               <a href="https://yosazn.github.io/Biotech-Exp/Lab1.html" target="_blank" rel="noreferrer" className="px-10 py-5 rounded-full border backdrop-blur-md transition-all text-xl font-bold flex items-center gap-3 shadow-xl whitespace-nowrap bg-white/5 border-white/10 text-slate-400 hover:text-white hover:bg-white/10 hover:border-purple-500/50 hover:text-purple-400">
+                 <Microscope className="w-6 h-6" /> המעבדה הווירטואלית <ExternalLink className="w-4 h-4 opacity-60" />
+               </a>
              </div>
 
              {/* --- לשונית דגשים --- */}
@@ -979,7 +1007,7 @@ export default function App() {
       
       {/* תגית קרדיט / פאנל תחתון */}
       <footer className="app-footer py-8 text-center border-t border-slate-800 text-slate-600 font-light z-10">
-         מערכת מעבדות ביוטכנולוגיה | פותח להכנה מיטבית לבחינת הבגרות בתשפ"ו
+         מערכת מעבדות ביוטכנולוגיה | פותח להכנה מיטבית לבחינת הבגרות בתשפ"ז
       </footer>
 
       {/* מציג הגלריה — נפתח מעל הכל */}
