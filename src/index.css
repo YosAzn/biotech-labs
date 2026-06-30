@@ -242,7 +242,7 @@ body {
 
 .gallery-panel {
   position: relative;
-  width: min(1100px, 96vw); height: min(86vh, 900px);
+  width: min(1240px, 96vw); height: auto; max-height: 94vh;
   display: flex; flex-direction: column;
   border-radius: 2rem; overflow: hidden;
   background: rgba(15,23,42,.92);
@@ -257,9 +257,14 @@ body {
 }
 @keyframes gv-pop { from { transform: scale(.95); opacity: 0; } to { transform: scale(1); opacity: 1; } }
 
+/* אזור התצוגה מקובע ליחס שקופית 16:9 → מצגת נפתחת ממוקדת על שקופית אחת
+   שממלאת את המסגרת (במקום לגלוש ל-1.5 שקופיות עם פסים כהים). */
 .gallery-stage {
-  flex: 1; position: relative; display: flex; align-items: center; justify-content: center;
+  position: relative; display: flex; align-items: center; justify-content: center;
   background: #0b1020; overflow: hidden;
+  aspect-ratio: 16 / 9;
+  width: min(100%, calc((94vh - 9.5rem) * 16 / 9));
+  margin-inline: auto;
 }
 [data-theme="light"] .gallery-stage { background: #eef2f8; }
 .gallery-stage iframe, .gallery-stage img, .gallery-stage embed {
