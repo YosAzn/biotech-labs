@@ -771,7 +771,7 @@ export default function App() {
              <div className="text-center mb-24 flex flex-col items-center">
                  <h1 className="hero-title text-6xl md:text-8xl lg:text-[11rem] font-black text-transparent bg-clip-text drop-shadow-[0_0_60px_rgba(6,182,212,0.6)] mb-4 sm:mb-8 tracking-tighter leading-none select-none">BIO<span className="text-blue-500">TECH</span></h1>
 
-                 <p className="text-cyan-300 text-lg sm:text-3xl md:text-4xl font-light tracking-[0.1em] sm:tracking-[0.2em] uppercase drop-shadow-md text-center"><span className="font-black">מעבדות</span> לבגרות בביוטכנולוגיה</p>
+                 <p className="text-cyan-300 text-lg sm:text-3xl md:text-4xl font-light tracking-[0.1em] sm:tracking-[0.2em] uppercase drop-shadow-md text-center">מעבדות לבגרות בביוטכנולוגיה</p>
 
              </div>
 
