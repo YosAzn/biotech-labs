@@ -117,6 +117,9 @@ body {
   -webkit-background-clip: text; background-clip: text;
   -webkit-text-fill-color: transparent; color: transparent;
 }
+/* כותרת המשנה — בצבע "TECH" לכל ערכת נושא: כהה = blue-500, בהיר = מג'נטה */
+.hero-subtitle { color: #3b82f6; }
+[data-theme="light"] .hero-subtitle { color: #a21caf; }
 
 /* =======================  THEME TOGGLE BUTTON  ===================== */
 .theme-toggle {
